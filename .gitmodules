@@ -1,0 +1,4 @@
+[submodule "native"]
+	path = native
+	url = https://github.com/zboxfs/zbox.git
+	branch = nodejs

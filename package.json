@@ -1,0 +1,14 @@
+{
+  "name": "zbox-nodejs",
+  "version": "0.1.0",
+  "description": "",
+  "main": "lib/index.js",
+  "author": "Bo Lu <lv.patrick@gmail.com>",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "neon-cli": "^0.2.0"
+  },
+  "scripts": {
+    "install": "neon build"
+  }
+}
