@@ -1,0 +1,22 @@
+[package]
+name = "zbox-nodejs"
+version = "0.1.0"
+description = "Node.js binding for ZboxFS, a zero-details, privacy-focused in-app file system."
+authors = ["Bo Lu"]
+homepage = "https://github.com/zboxfs/zbox-nodejs"
+repository = "https://github.com/zboxfs/zbox-nodejs"
+readme = "README.md"
+license = "Apache-2.0"
+build = "build.rs"
+exclude = ["artifacts.json", "index.node"]
+
+[lib]
+name = "zbox_nodejs"
+crate-type = ["dylib"]
+
+[build-dependencies]
+neon-build = "0.2.0"
+
+[dependencies]
+neon = "0.2.0"
+zbox = { git = "https://github.com/zboxfs/zbox.git", features = ["storage-zbox-native"] }

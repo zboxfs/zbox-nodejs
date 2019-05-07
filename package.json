@@ -1,14 +1,26 @@
 {
   "name": "zbox-nodejs",
   "version": "0.1.0",
-  "description": "",
+  "description": "Node.js binding for ZboxFS",
   "main": "lib/index.js",
-  "author": "Bo Lu <lv.patrick@gmail.com>",
+  "author": "Bo Lu",
+  "homepage": "https://github.com/zboxfs/zbox-nodejs",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zboxfs/zbox-nodejs"
+  },
   "dependencies": {
     "neon-cli": "^0.2.0"
   },
   "scripts": {
-    "install": "neon build"
+    "install": "neon build",
+    "test": "./node_modules/mocha/bin/mocha",
+    "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^6.1.4",
+    "nodemon": "^1.19.0"
   }
 }
