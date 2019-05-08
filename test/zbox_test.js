@@ -108,7 +108,7 @@ describe('Repo Open/Close Test', function() {
     if (repo) await repo.close();
   });
 
-  it('should open repo with cryptos option in Node.js', async function() {
+  it('should open repo with cryptos option (Node.js)', async function() {
     if (!isNodeJs) return;
 
     let repo2 = await zbox.openRepo({ uri: uri2, pwd, opts: {
@@ -126,11 +126,6 @@ describe('Repo Open/Close Test', function() {
     await repo.close();
   });
 
-  it('should delete local cache for browser', async function() {
-    if (isNodeJs) return;
-    await zbox.deleteLocalCache(uri);
-  });
-
   it('should exit zbox', async function() {
     if (zbox) await zbox.exit();
   });
@@ -141,3 +136,330 @@ describe('Repo Open/Close Test', function() {
 
   after(async function() {});
 });
+
+// ============================================
+// File IO Test
+// ============================================
+describe.only('File IO Test', function() {
+  let repo, filePath;
+  const buf = new Uint8Array([1, 2, 3]);
+  const buf2 = new Uint8Array([4, 5, 6]);
+
+  this.timeout(TIMEOUT);
+
+  before(async function() {
+    filePath = `/${Date.now()}`;
+    await zbox.initEnv({ debug: true });
+    repo = await zbox.openRepo({ uri, pwd, opts: {
+      create: true,
+      versionLimit: 5
+    }});
+  });
+
+  it(`should not create file with wrong argument`, async function() {
+    await expectError(repo.openFile());
+    await expectError(repo.openFile(123));
+    await expectError(repo.openFile({}));
+    await expectError(repo.openFile({ opts: { create: true } }));
+  });
+
+  it(`should create empty file`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { create: true } });
+    expect(file).to.be.an('object');
+    await file.close();
+    let result = await repo.isFile(filePath);
+    expect(result).to.be.true;
+    result = await repo.isDir(filePath);
+    expect(result).to.be.false;
+  });
+
+  it(`should read empty file`, async function() {
+    let file = await repo.openFile(filePath);
+    let result = await file.readAll();
+    expect(result).to.be.an('uint8array');
+    expect(result.length).to.be.equal(0);
+    await file.close();
+  });
+
+  it(`should write to file in all`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { write: true } });
+    await file.writeOnce(buf.slice());
+    await file.close();
+  });
+
+  it(`should read file in parts`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+
+    if (isNodeJs) {
+      let result = await file.read(Buffer.from([0, 0]));
+      expect(Buffer.isBuffer(result)).to.be.true;
+      expect(result).to.eql(Buffer.from([1, 2]));
+      result = await file.read(new Uint8Array(2));
+      expect(result).to.eql(Buffer.from([3]));
+
+    } else {
+      let result = await file.read(new Uint8Array(2));
+      expect(result).to.eql(new Uint8Array([1, 2]));
+      result = await file.read((new Uint8Array(2)).buffer);
+      expect(result).to.eql(new Uint8Array([3]));
+    }
+
+    await file.close();
+  });
+
+  it(`should read file in all`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let result = await file.readAll();
+
+    if (isNodeJs) {
+      expect(Buffer.isBuffer(result)).to.be.true;
+    } else {
+      expect(result).to.be.an('uint8array');
+    }
+    expect(result).to.eql(buf);
+    await file.close();
+  });
+
+  it(`should read as stream (Node.js)`, function(done) {
+    if (!isNodeJs) return;
+
+    let file;
+
+    repo.openFile({ path: filePath, opts: { read: true } })
+      .then(f => {
+        file = f;
+        return file.readStream();
+      })
+      .then(rdr => {
+        rdr.on('data', (chunk) => {
+          expect(Buffer.isBuffer(chunk)).to.be.true;
+          expect(chunk).to.eql(buf);
+        });
+        rdr.on('end', async () => {
+          await file.close();
+          done();
+        });
+        rdr.on('error', async (err) => {
+          await file.close();
+          done(err);
+        });
+      });
+  });
+
+  it(`should write to file in parts again`, async function() {
+
+    let file = await repo.openFile({ path: filePath, opts: { write: true } });
+
+    if (isNodeJs) {
+      let result = await file.write(buf2.slice(0, 2));
+      expect(result).to.equal(2);
+      result = await file.write(Buffer.from(buf2.slice(2)));
+      expect(result).to.equal(1);
+    } else {
+      let result = await file.write(buf2.slice(0, 2));
+      expect(result).to.equal(2);
+      result = await file.write(new Uint8Array(buf2.buffer, 2).slice());
+      expect(result).to.equal(1);
+    }
+
+    await file.finish();
+    await file.close();
+
+  });
+
+  it(`should read file all again`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let result = await file.readAll();
+    if (isNodeJs) {
+      expect(Buffer.isBuffer(result)).to.be.true;
+    } else {
+      expect(result).to.be.an('uint8array');
+    }
+    expect(result).to.eql(buf2);
+    await file.close();
+  });
+
+  it(`should get current version of file`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let ver = await file.currVersion();
+    expect(ver).to.equal(3);
+    await file.close();
+  });
+
+  it(`should get metadata of file`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let md = await file.metadata();
+    expect(md).to.be.an('object');
+    expect(md.fileType).to.equal('File');
+    expect(md.contentLen).to.equal(3);
+    expect(md.currVersion).to.equal(3);
+    expect(md.createdAt).to.be.a('number');
+    expect(md.modifiedAt).to.be.a('number');
+    await file.close();
+  });
+
+  it(`should get history of file`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let hist = await file.history();
+    expect(hist).to.be.an('array');
+    expect(hist.length).to.equal(3);
+    expect(hist[2].num).to.equal(3);
+    expect(hist[2].contentLen).to.equal(3);
+    expect(hist[2].createdAt).to.be.a('number');
+    await file.close();
+  });
+
+  it(`should able to read current versions`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let ver = await file.currVersion();
+    expect(ver).to.equal(3);
+
+    let vrdr = await file.versionReader(ver);
+    let result = await vrdr.readAll();
+    if (isNodeJs) {
+      expect(Buffer.isBuffer(result)).to.be.true;
+    } else {
+      expect(result).to.be.an('uint8array');
+    }
+    expect(result).to.eql(buf2);
+    await vrdr.close();
+
+    await file.close();
+  });
+
+  it(`should able to read previous versions`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let ver = await file.currVersion();
+    expect(ver).to.equal(3);
+
+    var vrdr = await file.versionReader(ver - 1);
+
+    var result = await vrdr.read(new Uint8Array(2));
+    expect(result).to.eql(new Uint8Array([1, 2]));
+    result = await vrdr.read(new Uint8Array(2));
+    expect(result).to.eql(new Uint8Array([3]));
+    await vrdr.close();
+
+    // test version reader seek
+    var vrdr = await file.versionReader(ver - 1);
+    await vrdr.seek({ from: Zbox.SeekFrom.Start, offset: 1 });
+    result = await vrdr.readAll();
+    expect(result).to.eql(new Uint8Array([2, 3]));
+    await vrdr.close();
+
+    await file.close();
+  });
+
+  it(`should able to seek in file`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { read: true } });
+    let newPos = await file.seek({ from: Zbox.SeekFrom.Start, offset: 1 });
+    expect(newPos).to.equal(1);
+    newPos = await file.seek({ from: Zbox.SeekFrom.Start, offset: 2 });
+    expect(newPos).to.equal(2);
+    newPos = await file.seek({ from: Zbox.SeekFrom.End, offset: -2 });
+    expect(newPos).to.equal(1);
+    newPos = await file.seek({ from: Zbox.SeekFrom.Current, offset: 1 });
+    expect(newPos).to.equal(2);
+    await file.close();
+  });
+
+  it(`should write to file at offset 1`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { write: true } });
+
+    await file.seek({ from: Zbox.SeekFrom.Start, offset: 1 });
+    await file.writeOnce(buf);
+
+    // read new file content from start
+    await file.seek({ from: Zbox.SeekFrom.Start, offset: 0 });
+    let result = await file.readAll();
+    expect(result).to.eql(new Uint8Array([4, 1, 2, 3]));
+
+    await file.close();
+  });
+
+  it(`should able to truncate file length to 2`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { write: true } });
+    await file.setLen(2);
+    await file.seek({ from: Zbox.SeekFrom.Start, offset: 0 });
+    let result = await file.readAll();
+    expect(result).to.eql(new Uint8Array([4, 1]));
+    await file.close();
+  });
+
+  it(`should able to extend file length to 4`, async function() {
+    let file = await repo.openFile({ path: filePath, opts: { write: true } });
+    await file.setLen(4);
+    await file.seek({ from: Zbox.SeekFrom.Start, offset: 0 });
+    let result = await file.readAll();
+    expect(result).to.eql(new Uint8Array([4, 1, 0, 0]));
+    await file.close();
+  });
+
+  it(`should able to read and write string to file`, async function() {
+    const path = `/${Date.now()}`;
+    const str = 'foo bar';
+
+    let file = await repo.openFile({ path, opts: { create: true } });
+    await file.writeOnce(str);
+
+    await file.seek({ from: Zbox.SeekFrom.Start, offset: 0 });
+    let result = await file.readAllString();
+    expect(result).to.equal(str);
+
+    await file.close();
+  });
+
+  it(`should able to run API reference doc example #1`, async function() {
+    const buf = new Uint8Array([1, 2, 3, 4, 5, 6]);
+    const path = `/${Date.now()}`;
+    var file = await repo.createFile(path);
+    await file.writeOnce(buf.slice());
+
+    // read the first 2 bytes
+    await file.seek({ from: Zbox.SeekFrom.Start, offset: 0 });
+    var dst = await file.read(new Uint8Array(2));   // now dst is [1, 2]
+    expect(dst).to.eql(new Uint8Array([1, 2]));
+
+    // create a new version, now the file content is [1, 2, 7, 8, 5, 6]
+    await file.writeOnce(new Uint8Array([7, 8]));
+
+    // notice that reading is on the latest version
+    await file.seek({ from: Zbox.SeekFrom.Current, offset: -2 });
+    dst = await file.read(dst);   // now dst is [7, 8]
+    expect(dst).to.eql(new Uint8Array([7, 8]));
+
+    await file.close();
+  });
+
+  it(`should able to run API reference doc example #2`, async function() {
+    const path = `/${Date.now()}`;
+
+    // create file and write 2 versions
+    var file = await repo.createFile(path);
+    await file.writeOnce('foo');
+    await file.writeOnce('bar');
+
+    // get latest version number
+    const currVer = await file.currVersion();
+
+    // create a version reader and read latest version of content
+    var vrdr = await file.versionReader(currVer);
+    var content = await vrdr.readAllString();    // now content is 'foobar'
+    expect(content).to.equal('foobar');
+    await vrdr.close();
+
+    // create another version reader and read previous version of content
+    vrdr = await file.versionReader(currVer - 1);
+    content = await vrdr.readAllString()    // now content is 'foo'
+    expect(content).to.equal('foo');
+    await vrdr.close();
+
+    await file.close();
+  });
+
+  after(async function() {
+    if (repo) await repo.close();
+    if (zbox) await zbox.exit();
+  });
+});
+

@@ -93,9 +93,9 @@ fn open_repo(mut cx: FunctionContext) -> JsResult<JsNumber> {
 
     opener.open(&uri, &pwd)
         .or_else(|err| cx.throw_error(error_string(err)))
-        .and_then(|repo| {
+        .map(|repo| {
             let ptr_num = Box::into_raw(Box::new(repo)) as i64;
-            Ok(cx.number(ptr_num as f64))
+            cx.number(ptr_num as f64)
         })
 }
 
@@ -239,83 +239,6 @@ repo_async_task! {
 
     complete(cx, ret) {
         Ok(cx.boolean(ret))
-    }
-}
-
-repo_async_task! {
-    struct RepoIsFileTask {
-        path: String,
-    }
-
-    output = bool,
-    js_event = JsBoolean,
-
-    perform(self, repo) {
-        repo.is_file(&self.path)
-    }
-
-    complete(cx, ret) {
-        Ok(cx.boolean(ret))
-    }
-}
-
-repo_async_task! {
-    struct RepoIsDirTask {
-        path: String,
-    }
-
-    output = bool,
-    js_event = JsBoolean,
-
-    perform(self, repo) {
-        repo.is_dir(&self.path)
-    }
-
-    complete(cx, ret) {
-        Ok(cx.boolean(ret))
-    }
-}
-
-repo_async_task! {
-    struct RepoOpenFileTask {
-        path: String,
-        options: OpenOptions,
-    }
-
-    output = f64,
-    js_event = JsNumber,
-
-    perform(self, repo) {
-        let file = self.options.open(&mut *repo, &self.path)?;
-        let ptr_num = Box::into_raw(Box::new(file)) as i64;
-        Ok(ptr_num as f64)
-    }
-
-    complete(cx, ret) {
-        Ok(cx.number(ret))
-    }
-}
-
-repo_async_task! {
-    struct RepoCreateDirTask {
-        path: String,
-        create_all: bool,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, repo) {
-        if self.create_all {
-            repo.create_dir_all(&self.path)?;
-        } else {
-            repo.create_dir(&self.path)?;
-        }
-        Ok(())
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
     }
 }
 
@@ -490,123 +413,6 @@ repo_async_task! {
     }
 }
 
-macro_rules! file_async_task {
-    (
-        struct $cls:ident {
-            $($field:ident: $field_type:ty,)*
-        }
-        output = $output:ty,
-        js_event = $js_event:ty,
-        perform($self:ident, $file:ident) $perform:block
-        complete($cx:ident, $ret:ident) $complete:block
-    ) => {
-        async_task!{
-            struct $cls {
-                file: FileWrapper,
-                $($field: $field_type,)*
-            }
-
-            output = $output,
-            js_event = $js_event,
-
-            perform($self) {
-                match *$self.file.0.lock().unwrap() {
-                    Some(ref mut $file) => $perform,
-                    None => Err(Error::Closed),
-                }
-            }
-
-            complete($cx, $ret) $complete
-        }
-    }
-}
-
-file_async_task! {
-    struct FileReadAllTask {
-    }
-
-    output = Vec<u8>,
-    js_event = JsArrayBuffer,
-
-    perform(self, file) {
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf)?;
-        Ok(buf)
-    }
-
-    complete(cx, ret) {
-        let buf = JsArrayBuffer::new(&mut cx, ret.len() as u32)?;
-        cx.borrow(&buf, |buf_data| {
-            let slice = buf_data.as_mut_slice::<u8>();
-            slice.copy_from_slice(&ret[..]);
-        });
-        Ok(buf)
-    }
-}
-
-file_async_task! {
-    struct FileWriteOnceTask {
-        data: Vec<u8>,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, file) {
-        file.write_once(&self.data)
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
-}
-
-file_async_task! {
-    struct FileSetLenTask {
-        len: usize,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, file) {
-        file.set_len(self.len)
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
-}
-
-async_task! {
-    struct VersionReaderReadAllTask {
-        rdr: VersionReaderWrapper,
-    }
-
-    output = Vec<u8>,
-    js_event = JsArrayBuffer,
-
-    perform(self) {
-        let mut buf = Vec::new();
-        match *self.rdr.0.lock().unwrap() {
-            Some(ref mut rdr) => rdr
-                .read_to_end(&mut buf)
-                .map(|_| buf)
-                .map_err(Error::from),
-            None => Err(Error::Closed),
-        }
-    }
-
-    complete(cx, ret) {
-        let buf = JsArrayBuffer::new(&mut cx, ret.len() as u32)?;
-        cx.borrow(&buf, |buf_data| {
-            let slice = buf_data.as_mut_slice::<u8>();
-            slice.copy_from_slice(&ret[..]);
-        });
-        Ok(buf)
-    }
-}
-
 macro_rules! simple_repo_method {
     ($cx:ident, $task_cls:ident) => {{
         let path = $cx.argument::<JsString>(0)?.value();
@@ -646,36 +452,38 @@ declare_types! {
 
         method info(mut cx) {
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let capsule = inner.0.lock().unwrap();
-                match *capsule {
+                let wrapper = inner.0.lock().unwrap();
+                match *wrapper {
                     Some(ref repo) => repo.info(),
                     None => Err(Error::Closed),
                 }
             };
-            result.or_else(|err| cx.throw_error(error_string(err)))
-            .and_then(|info| {
-                let info_obj = JsObject::new(&mut cx);
-                let val = cx.string(info.volume_id().to_string());
-                info_obj.set(&mut cx, "volumeId", val)?;
-                let val = cx.string(info.version());
-                info_obj.set(&mut cx, "version", val)?;
-                let val = cx.string(info.uri());
-                info_obj.set(&mut cx, "uri", val)?;
-                let val = cx.boolean(info.compress());
-                info_obj.set(&mut cx, "compress", val)?;
-                let val = cx.number(info.version_limit());
-                info_obj.set(&mut cx, "versionLimit", val)?;
-                let val = cx.boolean(info.dedup_chunk());
-                info_obj.set(&mut cx, "dedupChunk", val)?;
-                let val = cx.boolean(info.is_read_only());
-                info_obj.set(&mut cx, "readOnly", val)?;
-                let val = cx.number(time_to_f64(info.created_at()));
-                info_obj.set(&mut cx, "ctime", val)?;
-                Ok(info_obj.upcast())
-            })
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|info| {
+                    let info_obj = JsObject::new(&mut cx);
+                    let val = cx.string(info.volume_id().to_string());
+                    info_obj.set(&mut cx, "volumeId", val)?;
+                    let val = cx.string(info.version());
+                    info_obj.set(&mut cx, "version", val)?;
+                    let val = cx.string(info.uri());
+                    info_obj.set(&mut cx, "uri", val)?;
+                    let val = cx.boolean(info.compress());
+                    info_obj.set(&mut cx, "compress", val)?;
+                    let val = cx.number(info.version_limit());
+                    info_obj.set(&mut cx, "versionLimit", val)?;
+                    let val = cx.boolean(info.dedup_chunk());
+                    info_obj.set(&mut cx, "dedupChunk", val)?;
+                    let val = cx.boolean(info.is_read_only());
+                    info_obj.set(&mut cx, "readOnly", val)?;
+                    let val = cx.number(time_to_f64(info.created_at()));
+                    info_obj.set(&mut cx, "ctime", val)?;
+                    Ok(info_obj.upcast())
+                })
         }
 
         method resetPassword(mut cx) {
@@ -706,11 +514,43 @@ declare_types! {
         }
 
         method isFile(mut cx) {
-            simple_repo_method!(cx, RepoIsFileTask)
+            let path = cx.argument::<JsString>(0)?.value();
+            let this = cx.this();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref repo) => repo.is_file(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|result| {
+                    Ok(cx.boolean(result).upcast())
+                })
         }
 
         method isDir(mut cx) {
-            simple_repo_method!(cx, RepoIsDirTask)
+            let path = cx.argument::<JsString>(0)?.value();
+            let this = cx.this();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref repo) => repo.is_dir(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|result| {
+                    Ok(cx.boolean(result).upcast())
+                })
         }
 
         method createFile(mut cx) {
@@ -736,10 +576,8 @@ declare_types! {
 
         method openFile(mut cx) {
             let path = cx.argument::<JsString>(0)?.value();
-            let this = cx.this();
-
             let opts = cx.argument::<JsObject>(1)?;
-            let callback = cx.argument::<JsFunction>(2)?;
+            let this = cx.this();
 
             let mut options = OpenOptions::new();
             if let Ok(read) = opts.get(&mut cx, "read")?
@@ -783,52 +621,57 @@ declare_types! {
                 options.dedup_chunk(dedup.value());
             }
 
-            {
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoOpenFileTask {
-                    repo: inner.clone(),
-                    path,
-                    options
-                };
-                task.schedule(callback);
-            }
-
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => options.open(repo, &path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|file| {
+                    let ptr_num = Box::into_raw(Box::new(file)) as i64;
+                    Ok(cx.number(ptr_num as f64).upcast())
+                })
         }
 
         method createDir(mut cx) {
             let path = cx.argument::<JsString>(0)?.value();
-            let callback = cx.argument::<JsFunction>(1)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoCreateDirTask {
-                    repo: inner.clone(),
-                    path,
-                    create_all: false
-                };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.create_dir(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method createDirAll(mut cx) {
             let path = cx.argument::<JsString>(0)?.value();
-            let callback = cx.argument::<JsFunction>(1)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoCreateDirTask {
-                    repo: inner.clone(),
-                    path,
-                    create_all: true
-                };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.create_dir_all(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method readDir(mut cx) {
@@ -922,15 +765,18 @@ declare_types! {
             {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let mut capsule = inner.0.lock().unwrap();
-                capsule.take();
+                let mut wrapper = inner.0.lock().unwrap();
+                wrapper.take();
             }
             Ok(cx.undefined().upcast())
         }
 
         method read(mut cx) {
             let buf = cx.argument::<JsArrayBuffer>(0)?;
+            let buf_offset = cx.argument::<JsNumber>(1)?.value() as usize;
+            let buf_len = cx.argument::<JsNumber>(2)?.value() as usize;
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
@@ -938,31 +784,50 @@ declare_types! {
                     let slice = data.as_mut_slice::<u8>();
                     match *inner.0.lock().unwrap() {
                         Some(ref mut file) => file
-                            .read(slice)
+                            .read(&mut slice[buf_offset..buf_offset + buf_len])
                             .map_err(Error::from),
                         None => Err(Error::Closed),
                     }
                 })
             };
-            result.map(|read| cx.number(read as f64).upcast())
-                    .or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|read| Ok(cx.number(read as f64).upcast()))
         }
 
         method readAll(mut cx) {
-            let callback = cx.argument::<JsFunction>(0)?;
             let this = cx.this();
-            {
+            let mut buf = Vec::new();
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = FileReadAllTask{ file: inner.clone() };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut file) => file
+                        .read_to_end(&mut buf)
+                        .map_err(Error::from),
+                    None => Err(Error::Closed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| {
+                    let ret = cx.array_buffer(buf.len() as u32)?;
+                    cx.borrow(&ret, |buf_data| {
+                        let slice = buf_data.as_mut_slice::<u8>();
+                        slice.copy_from_slice(&buf[..]);
+                    });
+                    Ok(ret.upcast())
+                })
         }
 
         method write(mut cx) {
             let buf = cx.argument::<JsArrayBuffer>(0)?;
+            let buf_offset = cx.argument::<JsNumber>(1)?.value() as usize;
+            let buf_len = cx.argument::<JsNumber>(2)?.value() as usize;
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
@@ -970,59 +835,68 @@ declare_types! {
                     let slice = data.as_slice::<u8>();
                     match *inner.0.lock().unwrap() {
                         Some(ref mut file) => file
-                            .write(slice)
+                            .write(&slice[buf_offset..buf_offset + buf_len])
                             .map_err(Error::from),
                         None => Err(Error::Closed),
                     }
                 })
             };
-            result.map(|written| cx.number(written as f64).upcast())
-                    .or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|written| Ok(cx.number(written as f64).upcast()))
         }
 
         method finish(mut cx) {
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let mut capsule = inner.0.lock().unwrap();
-                match *capsule {
+                let mut wrapper = inner.0.lock().unwrap();
+                match *wrapper {
                     Some(ref mut file) => file.finish(),
                     None => Err(Error::Closed),
                 }
             };
-            result.map(|_| cx.undefined().upcast())
-                    .or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method writeOnce(mut cx) {
             let buf = cx.argument::<JsArrayBuffer>(0)?;
-            let callback = cx.argument::<JsFunction>(1)?;
+            let buf_offset = cx.argument::<JsNumber>(1)?.value() as usize;
+            let buf_len = cx.argument::<JsNumber>(2)?.value() as usize;
             let this = cx.this();
 
-            let data = cx.borrow(&buf, |data| {
-                let slice = data.as_slice::<u8>();
-                slice.to_vec()
-            });
-
-            {
+            let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let task = FileWriteOnceTask{ file: inner.clone(), data };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                cx.borrow(&buf, |data| {
+                    let slice = data.as_slice::<u8>();
+                    match *inner.0.lock().unwrap() {
+                        Some(ref mut file) => file
+                            .write_once(&slice[buf_offset..buf_offset + buf_len])
+                            .map_err(Error::from),
+                        None => Err(Error::Closed),
+                    }
+                })
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method seek(mut cx) {
             let from = cx.argument::<JsNumber>(0)?.value() as u32;
             let offset = cx.argument::<JsNumber>(1)?.value();
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let mut capsule = inner.0.lock().unwrap();
-                match *capsule {
+                let mut wrapper = inner.0.lock().unwrap();
+                match *wrapper {
                     Some(ref mut file) => {
                         match from {
                             0 => Ok(SeekFrom::Start(offset as u64)),
@@ -1034,109 +908,125 @@ declare_types! {
                     None => Err(Error::Closed),
                 }
             };
-            result.map(|new_pos| cx.number(new_pos as f64).upcast())
-                    .or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|new_pos| Ok(cx.number(new_pos as f64).upcast()))
         }
 
         method setLen(mut cx) {
             let len = cx.argument::<JsNumber>(0)?.value() as usize;
-            let callback = cx.argument::<JsFunction>(1)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let task = FileSetLenTask{ file: inner.clone(), len };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let mut wrapper = inner.0.lock().unwrap();
+                match *wrapper {
+                    Some(ref mut file) => file.set_len(len),
+                    None => Err(Error::Closed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method currVersion(mut cx) {
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let capsule = inner.0.lock().unwrap();
-                match *capsule {
+                let wrapper = inner.0.lock().unwrap();
+                match *wrapper {
                     Some(ref file) => file.curr_version(),
                     None => Err(Error::Closed),
                 }
             };
-            result.map(|ver| cx.number(ver as f64).upcast())
-                    .or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|ver| Ok(cx.number(ver as f64).upcast()))
         }
 
         method versionReader(mut cx) {
             let ver_num = cx.argument::<JsNumber>(0)?.value() as usize;
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let capsule = inner.0.lock().unwrap();
-                match *capsule {
+                let wrapper = inner.0.lock().unwrap();
+                match *wrapper {
                     Some(ref file) => file
                         .version_reader(ver_num)
                         .map(|rdr| Box::into_raw(Box::new(rdr)) as i64),
                     None => Err(Error::Closed),
                 }
             };
-            result.map(|ptr_num| cx.number(ptr_num as f64).upcast())
-                    .or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|ptr_num| Ok(cx.number(ptr_num as f64).upcast()))
         }
 
         method metadata(mut cx) {
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let mut capsule = inner.0.lock().unwrap();
-                match *capsule {
+                let mut wrapper = inner.0.lock().unwrap();
+                match *wrapper {
                     Some(ref file) => file.metadata(),
                     None => Err(Error::Closed),
                 }
             };
-            result.map(|md| {
-                let meta = JsObject::new(&mut cx);
-                let val: String = md.file_type().into();
-                let val = cx.string(val);
-                meta.set(&mut cx, "fileType", val).unwrap();
-                let val = cx.number(md.content_len() as f64);
-                meta.set(&mut cx, "contentLen", val).unwrap();
-                let val = cx.number(md.curr_version() as f64);
-                meta.set(&mut cx, "currVersion", val).unwrap();
-                let val = cx.number(time_to_f64(md.created_at()));
-                meta.set(&mut cx, "createdAt", val).unwrap();
-                let val = cx.number(time_to_f64(md.modified_at()));
-                meta.set(&mut cx, "modifiedAt", val).unwrap();
-                meta.upcast()
-            }).or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|md| {
+                    let meta = JsObject::new(&mut cx);
+                    let val: String = md.file_type().into();
+                    let val = cx.string(val);
+                    meta.set(&mut cx, "fileType", val).unwrap();
+                    let val = cx.number(md.content_len() as f64);
+                    meta.set(&mut cx, "contentLen", val).unwrap();
+                    let val = cx.number(md.curr_version() as f64);
+                    meta.set(&mut cx, "currVersion", val).unwrap();
+                    let val = cx.number(time_to_f64(md.created_at()));
+                    meta.set(&mut cx, "createdAt", val).unwrap();
+                    let val = cx.number(time_to_f64(md.modified_at()));
+                    meta.set(&mut cx, "modifiedAt", val).unwrap();
+                    Ok(meta.upcast())
+                })
         }
 
         method history(mut cx) {
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let mut capsule = inner.0.lock().unwrap();
-                match *capsule {
+                let mut wrapper = inner.0.lock().unwrap();
+                match *wrapper {
                     Some(ref file) => file.history(),
                     None => Err(Error::Closed),
                 }
             };
-            result.map(|hist| {
-                let js_array = JsArray::new(&mut cx, hist.len() as u32);
-                for (i, version) in hist.iter().enumerate() {
-                    let js_ver = JsObject::new(&mut cx);
-                    let val = cx.number(version.num() as f64);
-                    js_ver.set(&mut cx, "num", val).unwrap();
-                    let val = cx.number(version.content_len() as f64);
-                    js_ver.set(&mut cx, "contentLen", val).unwrap();
-                    let val = cx.number(time_to_f64(version.created_at()));
-                    js_ver.set(&mut cx, "createdAt", val).unwrap();
-                    js_array.set(&mut cx, i as u32, js_ver).unwrap();
-                }
-                js_array.upcast()
-            }).or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|hist| {
+                    let js_array = JsArray::new(&mut cx, hist.len() as u32);
+                    for (i, version) in hist.iter().enumerate() {
+                        let js_ver = JsObject::new(&mut cx);
+                        let val = cx.number(version.num() as f64);
+                        js_ver.set(&mut cx, "num", val).unwrap();
+                        let val = cx.number(version.content_len() as f64);
+                        js_ver.set(&mut cx, "contentLen", val).unwrap();
+                        let val = cx.number(time_to_f64(version.created_at()));
+                        js_ver.set(&mut cx, "createdAt", val).unwrap();
+                        js_array.set(&mut cx, i as u32, js_ver).unwrap();
+                    }
+                    Ok(js_array.upcast())
+                })
         }
     }
 
@@ -1152,40 +1042,87 @@ declare_types! {
             {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let mut capsule = inner.0.lock().unwrap();
-                capsule.take();
+                let mut wrapper = inner.0.lock().unwrap();
+                wrapper.take();
             }
             Ok(cx.undefined().upcast())
         }
 
         method read(mut cx) {
             let buf = cx.argument::<JsArrayBuffer>(0)?;
+            let buf_offset = cx.argument::<JsNumber>(1)?.value() as usize;
+            let buf_len = cx.argument::<JsNumber>(2)?.value() as usize;
             let this = cx.this();
+
             let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
                 cx.borrow(&buf, |data| {
                     let slice = data.as_mut_slice::<u8>();
                     match *inner.0.lock().unwrap() {
-                        Some(ref mut rdr) => rdr.read(slice).map_err(Error::from),
+                        Some(ref mut vrdr) => vrdr
+                            .read(&mut slice[buf_offset..buf_offset + buf_len])
+                            .map_err(Error::from),
                         None => Err(Error::Closed),
                     }
                 })
             };
-            result.map(|read| cx.number(read as f64).upcast())
-                    .or_else(|err| cx.throw_error(error_string(err)))
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|read| Ok(cx.number(read as f64).upcast()))
         }
 
         method readAll(mut cx) {
-            let callback = cx.argument::<JsFunction>(0)?;
             let this = cx.this();
-            {
+            let mut buf = Vec::new();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut vrdr) => vrdr
+                        .read_to_end(&mut buf)
+                        .map_err(Error::from),
+                    None => Err(Error::Closed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| {
+                    let ret = cx.array_buffer(buf.len() as u32)?;
+                    cx.borrow(&ret, |buf_data| {
+                        let slice = buf_data.as_mut_slice::<u8>();
+                        slice.copy_from_slice(&buf[..]);
+                    });
+                    Ok(ret.upcast())
+                })
+        }
+
+        method seek(mut cx) {
+            let from = cx.argument::<JsNumber>(0)?.value() as u32;
+            let offset = cx.argument::<JsNumber>(1)?.value();
+            let this = cx.this();
+
+            let result = {
                 let guard = cx.lock();
                 let inner = this.borrow(&guard);
-                let task = VersionReaderReadAllTask{ rdr: inner.clone() };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let mut wrapper = inner.0.lock().unwrap();
+                match *wrapper {
+                    Some(ref mut vrdr) => {
+                        match from {
+                            0 => Ok(SeekFrom::Start(offset as u64)),
+                            1 => Ok(SeekFrom::End(offset as i64)),
+                            2 => Ok(SeekFrom::Current(offset as i64)),
+                            _ => Err(Error::InvalidArgument),
+                        }.and_then(|pos| vrdr.seek(pos).map_err(Error::from))
+                    }
+                    None => Err(Error::Closed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|new_pos| Ok(cx.number(new_pos as f64).upcast()))
         }
     }
 }
