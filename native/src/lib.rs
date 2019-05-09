@@ -47,11 +47,16 @@ fn init_env(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn open_repo(mut cx: FunctionContext) -> JsResult<JsNumber> {
     let args = cx.argument::<JsObject>(0)?;
 
-    let uri = args.get(&mut cx, "uri")?
-        .downcast_or_throw::<JsString, FunctionContext>(&mut cx)?.value();
-    let pwd = args.get(&mut cx, "pwd")?
-        .downcast_or_throw::<JsString, FunctionContext>(&mut cx)?.value();
-    let opts = args.get(&mut cx, "opts")?
+    let uri = args
+        .get(&mut cx, "uri")?
+        .downcast_or_throw::<JsString, FunctionContext>(&mut cx)?
+        .value();
+    let pwd = args
+        .get(&mut cx, "pwd")?
+        .downcast_or_throw::<JsString, FunctionContext>(&mut cx)?
+        .value();
+    let opts = args
+        .get(&mut cx, "opts")?
         .downcast_or_throw::<JsObject, FunctionContext>(&mut cx)?;
 
     let mut opener = RepoOpener::new();
@@ -90,7 +95,8 @@ fn open_repo(mut cx: FunctionContext) -> JsResult<JsNumber> {
         opener.read_only(read_only.value());
     }
 
-    opener.open(&uri, &pwd)
+    opener
+        .open(&uri, &pwd)
         .or_else(|err| cx.throw_error(error_string(err)))
         .map(|repo| {
             let ptr_num = Box::into_raw(Box::new(repo)) as i64;
