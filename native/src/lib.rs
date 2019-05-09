@@ -10,9 +10,8 @@ use std::time::SystemTime;
 use neon::prelude::*;
 
 use zbox::{
-    init_env as zbox_init_env, Cipher, DirEntry, Error, File, MemLimit,
-    Metadata, OpenOptions, OpsLimit, Repo, RepoOpener, Result, Version,
-    VersionReader,
+    init_env as zbox_init_env, Cipher, Error, File, MemLimit, Metadata,
+    OpenOptions, OpsLimit, Repo, RepoOpener, Version, VersionReader,
 };
 
 type Wrapper<T> = Arc<Mutex<Option<Box<T>>>>;
@@ -99,154 +98,28 @@ fn open_repo(mut cx: FunctionContext) -> JsResult<JsNumber> {
         })
 }
 
-macro_rules! async_task {
-    (
-        struct $cls:ident {
-            $($field:ident: $field_type:ty,)*
-        }
-        output = $output:ty,
-        js_event = $js_event:ty,
-        perform($self:ident) $perform:block
-        complete($cx:ident, $ret:ident) $complete:block
-    ) => {
-        struct $cls {
-            $($field: $field_type,)*
-        }
-
-        impl Task for $cls {
-                type Output = $output;
-                type Error = Error;
-                type JsEvent = $js_event;
-
-                fn perform(&$self) -> Result<Self::Output> $perform
-
-                fn complete(self,
-                            mut $cx: TaskContext,
-                            result: Result<Self::Output>
-                            ) -> JsResult<Self::JsEvent>
-                {
-                    result
-                        .or_else(|err| $cx.throw_error(error_string(err)))
-                        .and_then(|$ret| $complete)
-                }
-        }
-    };
-}
-
-macro_rules! repo_async_task {
-    (
-        struct $cls:ident {
-            $($field:ident: $field_type:ty,)*
-        }
-        output = $output:ty,
-        js_event = $js_event:ty,
-        perform($self:ident, $repo:ident) $perform:block
-        complete($cx:ident, $ret:ident) $complete:block
-    ) => {
-        async_task!{
-            struct $cls {
-                repo: RepoWrapper,
-                $($field: $field_type,)*
-            }
-
-            output = $output,
-            js_event = $js_event,
-
-            perform($self) {
-                match *$self.repo.0.lock().unwrap() {
-                    Some(ref mut $repo) => $perform,
-                    None => Err(Error::RepoClosed),
-                }
-            }
-
-            complete($cx, $ret) $complete
-        }
-    }
-}
-
 #[allow(dead_code)]
 fn repo_exists(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     let uri = cx.argument::<JsString>(0)?.value();
     Repo::exists(&uri)
         .or_else(|err| cx.throw_error(error_string(err)))
-        .and_then(|result| {
-            Ok(cx.boolean(result))
-        })
-}
-
-async_task! {
-    struct RepoRepairSuperBlkTask {
-        uri: String,
-        pwd: String,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self) {
-        Repo::repair_super_block(&self.uri, &self.pwd)
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
+        .and_then(|result| Ok(cx.boolean(result)))
 }
 
 #[allow(dead_code)]
-fn repo_repair_super_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+fn repair_super_block(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let uri = cx.argument::<JsString>(0)?.value();
     let pwd = cx.argument::<JsString>(1)?.value();
-    let callback = cx.argument::<JsFunction>(2)?;
-    let task = RepoRepairSuperBlkTask { uri, pwd };
-    task.schedule(callback);
-    Ok(cx.undefined())
+    Repo::repair_super_block(&uri, &pwd)
+        .or_else(|err| cx.throw_error(error_string(err)))
+        .and_then(|_| Ok(cx.undefined()))
 }
 
-repo_async_task! {
-    struct RepoResetPwdTask {
-        old_pwd: String,
-        new_pwd: String,
-        ops_limit: OpsLimit,
-        mem_limit: MemLimit,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, repo) {
-        repo.reset_password(&self.old_pwd,
-                            &self.new_pwd,
-                            self.ops_limit,
-                            self.mem_limit)
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
-}
-
-repo_async_task! {
-    struct RepoPathExistsTask {
-        path: String,
-    }
-
-    output = bool,
-    js_event = JsBoolean,
-
-    perform(self, repo) {
-        repo.path_exists(&self.path)
-    }
-
-    complete(cx, ret) {
-        Ok(cx.boolean(ret))
-    }
-}
-
-fn metadata_to_js_obj<'a>(
-    cx: &mut TaskContext<'a>,
+fn metadata_to_js_obj<'a, C: Context<'a>>(
+    cx: &mut C,
     md: Metadata,
 ) -> Handle<'a, JsObject> {
-    let meta = JsObject::new(cx);
+    let meta = cx.empty_object();
     let val: String = md.file_type().into();
     let val = cx.string(val);
     meta.set(cx, "fileType", val).unwrap();
@@ -261,174 +134,22 @@ fn metadata_to_js_obj<'a>(
     meta
 }
 
-repo_async_task! {
-    struct RepoReadDirTask {
-        path: String,
+fn hist_to_js_array<'a, C: Context<'a>>(
+    cx: &mut C,
+    hist: Vec<Version>,
+) -> Handle<'a, JsArray> {
+    let js_array = cx.empty_array();
+    for (i, version) in hist.iter().enumerate() {
+        let js_ver = cx.empty_object();
+        let val = cx.number(version.num() as f64);
+        js_ver.set(cx, "num", val).unwrap();
+        let val = cx.number(version.content_len() as f64);
+        js_ver.set(cx, "contentLen", val).unwrap();
+        let val = cx.number(time_to_f64(version.created_at()));
+        js_ver.set(cx, "createdAt", val).unwrap();
+        js_array.set(cx, i as u32, js_ver).unwrap();
     }
-
-    output = Vec<DirEntry>,
-    js_event = JsArray,
-
-    perform(self, repo) {
-        repo.read_dir(&self.path)
-    }
-
-    complete(cx, ret) {
-        let js_array = JsArray::new(&mut cx, ret.len() as u32);
-        for (i, ent) in ret.iter().enumerate() {
-            let js_ent = JsObject::new(&mut cx);
-
-            let path = cx.string(ent.path().to_str().unwrap().to_owned());
-            let file_name = cx.string(ent.file_name().to_owned());
-            js_ent.set(&mut cx, "path", path).unwrap();
-            js_ent.set(&mut cx, "fileName", file_name).unwrap();
-            let meta = metadata_to_js_obj(&mut cx, ent.metadata());
-            js_ent.set(&mut cx, "metadata", meta).unwrap();
-
-            js_array.set(&mut cx, i as u32, js_ent).unwrap();
-        }
-        Ok(js_array)
-    }
-}
-
-repo_async_task! {
-    struct RepoMetadataTask {
-        path: String,
-    }
-
-    output = Metadata,
-    js_event = JsObject,
-
-    perform(self, repo) {
-        repo.metadata(&self.path)
-    }
-
-    complete(cx, ret) {
-        let meta = metadata_to_js_obj(&mut cx, ret);
-        Ok(meta)
-    }
-}
-
-repo_async_task! {
-    struct RepoHistoryTask {
-        path: String,
-    }
-
-    output = Vec<Version>,
-    js_event = JsArray,
-
-    perform(self, repo) {
-        repo.history(&self.path)
-    }
-
-    complete(cx, ret) {
-        let js_array = JsArray::new(&mut cx, ret.len() as u32);
-        for (i, version) in ret.iter().enumerate() {
-            let js_ver = JsObject::new(&mut cx);
-            let val = cx.number(version.num() as f64);
-            js_ver.set(&mut cx, "num", val).unwrap();
-            let val = cx.number(version.content_len() as f64);
-            js_ver.set(&mut cx, "contentLen", val).unwrap();
-            let val = cx.number(time_to_f64(version.created_at()));
-            js_ver.set(&mut cx, "createdAt", val).unwrap();
-            js_array.set(&mut cx, i as u32, js_ver).unwrap();
-        }
-        Ok(js_array)
-    }
-}
-
-repo_async_task! {
-    struct RepoCopyTask {
-        from: String,
-        to: String,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, repo) {
-        repo.copy(&self.from, &self.to)
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
-}
-
-repo_async_task! {
-    struct RepoRemoveFileTask {
-        path: String,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, repo) {
-        repo.remove_file(&self.path)
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
-}
-
-repo_async_task! {
-    struct RepoRemoveDirTask {
-        path: String,
-        remove_all: bool,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, repo) {
-        if self.remove_all {
-            repo.remove_dir_all(&self.path)?;
-        } else {
-            repo.remove_dir(&self.path)?;
-        }
-        Ok(())
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
-}
-
-repo_async_task! {
-    struct RepoRenameTask {
-        from: String,
-        to: String,
-    }
-
-    output = (),
-    js_event = JsUndefined,
-
-    perform(self, repo) {
-        repo.rename(&self.from, &self.to)
-    }
-
-    complete(cx, _ret) {
-        Ok(cx.undefined())
-    }
-}
-
-macro_rules! simple_repo_method {
-    ($cx:ident, $task_cls:ident) => {{
-        let path = $cx.argument::<JsString>(0)?.value();
-        let callback = $cx.argument::<JsFunction>(1)?;
-        let this = $cx.this();
-        {
-            let guard = $cx.lock();
-            let inner = this.borrow(&guard);
-            let task = $task_cls {
-                repo: inner.clone(),
-                path,
-            };
-            task.schedule(callback);
-        }
-        Ok($cx.undefined().upcast())
-    }};
+    js_array
 }
 
 declare_types! {
@@ -465,7 +186,7 @@ declare_types! {
             result
                 .or_else(|err| cx.throw_error(error_string(err)))
                 .and_then(|info| {
-                    let info_obj = JsObject::new(&mut cx);
+                    let info_obj = cx.empty_object();
                     let val = cx.string(info.volume_id().to_string());
                     info_obj.set(&mut cx, "volumeId", val)?;
                     let val = cx.string(info.version());
@@ -479,9 +200,9 @@ declare_types! {
                     let val = cx.boolean(info.dedup_chunk());
                     info_obj.set(&mut cx, "dedupChunk", val)?;
                     let val = cx.boolean(info.is_read_only());
-                    info_obj.set(&mut cx, "readOnly", val)?;
+                    info_obj.set(&mut cx, "isReadOnly", val)?;
                     let val = cx.number(time_to_f64(info.created_at()));
-                    info_obj.set(&mut cx, "ctime", val)?;
+                    info_obj.set(&mut cx, "createdAt", val)?;
                     Ok(info_obj.upcast())
                 })
         }
@@ -493,24 +214,39 @@ declare_types! {
                 OpsLimit::from(cx.argument::<JsNumber>(2)?.value() as i32);
             let mem_limit =
                 MemLimit::from(cx.argument::<JsNumber>(3)?.value() as i32);
-            let callback = cx.argument::<JsFunction>(4)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoResetPwdTask {
-                    repo: inner.clone(),
-                    old_pwd,
-                    new_pwd,
-                    ops_limit,
-                    mem_limit };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.reset_password(&old_pwd,
+                        &new_pwd, ops_limit, mem_limit),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method pathExists(mut cx) {
-            simple_repo_method!(cx, RepoPathExistsTask)
+            let path = cx.argument::<JsString>(0)?.value();
+            let this = cx.this();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref repo) => repo.path_exists(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|result| Ok(cx.boolean(result).upcast()))
         }
 
         method isFile(mut cx) {
@@ -520,7 +256,7 @@ declare_types! {
             let result = {
                 let guard = cx.lock();
                 let wrapper = this.borrow(&guard);
-                let mut inner = wrapper.0.lock().unwrap();
+                let inner = wrapper.0.lock().unwrap();
                 match *inner {
                     Some(ref repo) => repo.is_file(&path),
                     None => Err(Error::RepoClosed),
@@ -528,9 +264,7 @@ declare_types! {
             };
             result
                 .or_else(|err| cx.throw_error(error_string(err)))
-                .and_then(|result| {
-                    Ok(cx.boolean(result).upcast())
-                })
+                .and_then(|result| Ok(cx.boolean(result).upcast()))
         }
 
         method isDir(mut cx) {
@@ -540,7 +274,7 @@ declare_types! {
             let result = {
                 let guard = cx.lock();
                 let wrapper = this.borrow(&guard);
-                let mut inner = wrapper.0.lock().unwrap();
+                let inner = wrapper.0.lock().unwrap();
                 match *inner {
                     Some(ref repo) => repo.is_dir(&path),
                     None => Err(Error::RepoClosed),
@@ -548,9 +282,7 @@ declare_types! {
             };
             result
                 .or_else(|err| cx.throw_error(error_string(err)))
-                .and_then(|result| {
-                    Ok(cx.boolean(result).upcast())
-                })
+                .and_then(|result| Ok(cx.boolean(result).upcast()))
         }
 
         method createFile(mut cx) {
@@ -675,81 +407,170 @@ declare_types! {
         }
 
         method readDir(mut cx) {
-            simple_repo_method!(cx, RepoReadDirTask)
+            let path = cx.argument::<JsString>(0)?.value();
+            let this = cx.this();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref repo) => repo.read_dir(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|dirs| {
+                    let js_array = cx.empty_array();
+                    for (i, ent) in dirs.iter().enumerate() {
+                        let js_ent = cx.empty_object();
+
+                        let path = cx.string(ent.path().to_str().unwrap().to_owned());
+                        let file_name = cx.string(ent.file_name().to_owned());
+                        js_ent.set(&mut cx, "path", path).unwrap();
+                        js_ent.set(&mut cx, "fileName", file_name).unwrap();
+                        let md = metadata_to_js_obj(&mut cx, ent.metadata());
+                        js_ent.set(&mut cx, "metadata", md).unwrap();
+
+                        js_array.set(&mut cx, i as u32, js_ent).unwrap();
+                    }
+                    Ok(js_array.upcast())
+                })
         }
 
         method metadata(mut cx) {
-            simple_repo_method!(cx, RepoMetadataTask)
+            let path = cx.argument::<JsString>(0)?.value();
+            let this = cx.this();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref repo) => repo.metadata(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|md| {
+                    let metadata = metadata_to_js_obj(&mut cx, md);
+                    Ok(metadata.upcast())
+                })
         }
 
         method history(mut cx) {
-            simple_repo_method!(cx, RepoHistoryTask)
+            let path = cx.argument::<JsString>(0)?.value();
+            let this = cx.this();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref repo) => repo.history(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|hist| {
+                    let ret = hist_to_js_array(&mut cx, hist);
+                    Ok(ret.upcast())
+                })
         }
 
         method copy(mut cx) {
             let from = cx.argument::<JsString>(0)?.value();
             let to = cx.argument::<JsString>(1)?.value();
-            let callback = cx.argument::<JsFunction>(1)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoCopyTask { repo: inner.clone(), from, to };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.copy(&from, &to),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method removeFile(mut cx) {
-            simple_repo_method!(cx, RepoRemoveFileTask)
+            let path = cx.argument::<JsString>(0)?.value();
+            let this = cx.this();
+
+            let result = {
+                let guard = cx.lock();
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.remove_file(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method removeDir(mut cx) {
             let path = cx.argument::<JsString>(0)?.value();
-            let callback = cx.argument::<JsFunction>(1)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoRemoveDirTask {
-                    repo: inner.clone(),
-                    path,
-                    remove_all: false
-                };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.remove_dir(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method removeDirAll(mut cx) {
             let path = cx.argument::<JsString>(0)?.value();
-            let callback = cx.argument::<JsFunction>(1)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoRemoveDirTask {
-                    repo: inner.clone(),
-                    path,
-                    remove_all: true
-                };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.remove_dir_all(&path),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
 
         method rename(mut cx) {
             let from = cx.argument::<JsString>(0)?.value();
             let to = cx.argument::<JsString>(1)?.value();
-            let callback = cx.argument::<JsFunction>(1)?;
             let this = cx.this();
-            {
+
+            let result = {
                 let guard = cx.lock();
-                let inner = this.borrow(&guard);
-                let task = RepoRenameTask { repo: inner.clone(), from, to };
-                task.schedule(callback);
-            }
-            Ok(cx.undefined().upcast())
+                let wrapper = this.borrow(&guard);
+                let mut inner = wrapper.0.lock().unwrap();
+                match *inner {
+                    Some(ref mut repo) => repo.rename(&from, &to),
+                    None => Err(Error::RepoClosed),
+                }
+            };
+            result
+                .or_else(|err| cx.throw_error(error_string(err)))
+                .and_then(|_| Ok(cx.undefined().upcast()))
         }
     }
 
@@ -983,19 +804,8 @@ declare_types! {
             result
                 .or_else(|err| cx.throw_error(error_string(err)))
                 .and_then(|md| {
-                    let meta = JsObject::new(&mut cx);
-                    let val: String = md.file_type().into();
-                    let val = cx.string(val);
-                    meta.set(&mut cx, "fileType", val).unwrap();
-                    let val = cx.number(md.content_len() as f64);
-                    meta.set(&mut cx, "contentLen", val).unwrap();
-                    let val = cx.number(md.curr_version() as f64);
-                    meta.set(&mut cx, "currVersion", val).unwrap();
-                    let val = cx.number(time_to_f64(md.created_at()));
-                    meta.set(&mut cx, "createdAt", val).unwrap();
-                    let val = cx.number(time_to_f64(md.modified_at()));
-                    meta.set(&mut cx, "modifiedAt", val).unwrap();
-                    Ok(meta.upcast())
+                    let metadata = metadata_to_js_obj(&mut cx, md);
+                    Ok(metadata.upcast())
                 })
         }
 
@@ -1014,18 +824,8 @@ declare_types! {
             result
                 .or_else(|err| cx.throw_error(error_string(err)))
                 .and_then(|hist| {
-                    let js_array = JsArray::new(&mut cx, hist.len() as u32);
-                    for (i, version) in hist.iter().enumerate() {
-                        let js_ver = JsObject::new(&mut cx);
-                        let val = cx.number(version.num() as f64);
-                        js_ver.set(&mut cx, "num", val).unwrap();
-                        let val = cx.number(version.content_len() as f64);
-                        js_ver.set(&mut cx, "contentLen", val).unwrap();
-                        let val = cx.number(time_to_f64(version.created_at()));
-                        js_ver.set(&mut cx, "createdAt", val).unwrap();
-                        js_array.set(&mut cx, i as u32, js_ver).unwrap();
-                    }
-                    Ok(js_array.upcast())
+                    let ret = hist_to_js_array(&mut cx, hist);
+                    Ok(ret.upcast())
                 })
         }
     }
@@ -1131,7 +931,7 @@ register_module!(mut cx, {
     cx.export_function("initEnv", init_env)?;
     cx.export_function("openRepo", open_repo)?;
     cx.export_function("repoExists", repo_exists)?;
-    cx.export_function("repoRepairSuperBlock", repo_repair_super_block)?;
+    cx.export_function("repairSuperBlock", repair_super_block)?;
     cx.export_class::<JsRepo>("Repo")?;
     cx.export_class::<JsFile>("File")?;
     cx.export_class::<JsVersionReader>("VersionReader")?;
