@@ -14,7 +14,7 @@
     "neon-cli": "^0.2.0"
   },
   "scripts": {
-    "install": "neon build",
+    "build": "neon build",
     "test": "./node_modules/mocha/bin/mocha",
     "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'"
   },
