@@ -10,13 +10,30 @@
     "type": "git",
     "url": "https://github.com/zboxfs/zbox-nodejs"
   },
+  "files": [
+    "native/index.node",
+    "lib"
+  ],
+  "binary": {
+    "module_name": "index",
+    "host": "https://github.com/zboxfs/zbox-nodejs/releases/download/",
+    "remote_path": "{version}",
+    "package_name": "{node_abi}-{platform}-{arch}.tar.gz",
+    "module_path": "./native",
+    "pkg_path": "."
+  },
   "dependencies": {
-    "neon-cli": "^0.2.0"
+    "@amilajack/node-pre-gyp": "github:amilajack/node-pre-gyp#neon-compat",
+    "neon-cli": "^0.2.0",
+    "node-pre-gyp-github": "^1.4.3"
   },
   "scripts": {
     "build": "neon build",
     "test": "./node_modules/mocha/bin/mocha",
-    "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'"
+    "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'",
+    "install": "node-pre-gyp install --fallback-to-build=false || neon build --release",
+    "package": "node-pre-gyp package",
+    "upload-binary": "node-pre-gyp package && node-pre-gyp-github publish"
   },
   "devDependencies": {
     "chai": "^4.2.0",

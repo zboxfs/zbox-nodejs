@@ -2,13 +2,20 @@ const isNodeJs = (typeof process !== 'undefined') && (process.release.name === '
 
 const TIMEOUT = 60 * 1000;
 
-let uri = 'zbox://U9aZMugEpMXHG6fvz2F4UjNC@RqYWCVCTc77kan';
+let uri = 'zbox://d9Ysc4PJa5sT7NKJyxDjMpZg@jRpbY2DEra6qMR';
 let uri2 = 'zbox://2c3kbfSqsKYpf36fKKc5YpEY@Rwt6Nh6xesE3n5'; // for Node.js
 const pwd = 'pwd';
 
 if (isNodeJs) {
   uri += '?cache_type=file&base=./tt';
+
+  // if it runs on Travis CI server, skip the test just for now
+  if(process.env.CI) {
+    process.exit();
+  }
+
 } else {
+  // if it runs in browser
   uri += '?cache_type=browser';
 }
 
