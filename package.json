@@ -1,5 +1,5 @@
 {
-  "name": "zbox-nodejs",
+  "name": "@zbox/nodejs",
   "version": "0.1.0",
   "description": "Node.js binding for ZboxFS",
   "main": "lib/index.js",
@@ -8,7 +8,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zboxfs/zbox-nodejs"
+    "url": "git+https://github.com/zboxfs/zbox-nodejs.git"
   },
   "files": [
     "native/index.node",
@@ -28,7 +28,8 @@
     "node-pre-gyp-github": "^1.4.3"
   },
   "scripts": {
-    "build": "neon build",
+    "lint": "eslint ./lib",
+    "build": "neon build --release",
     "test": "./node_modules/mocha/bin/mocha",
     "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'",
     "install": "node-pre-gyp install --fallback-to-build=false || neon build --release",
@@ -38,6 +39,11 @@
   "devDependencies": {
     "chai": "^4.2.0",
     "mocha": "^6.1.4",
-    "nodemon": "^1.19.0"
+    "nodemon": "^1.19.0",
+    "eslint": "^5.14.1",
+    "eslint-config-bliss": "^3.3.0"
+  },
+  "eslintConfig": {
+    "extends": "bliss"
   }
 }
