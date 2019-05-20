@@ -1,6 +1,6 @@
 {
   "name": "@zbox/nodejs",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Node.js binding for ZboxFS",
   "main": "lib/index.js",
   "author": "Bo Lu",
@@ -11,7 +11,8 @@
     "url": "git+https://github.com/zboxfs/zbox-nodejs.git"
   },
   "files": [
-    "lib"
+    "lib",
+    "native/README.md"
   ],
   "binary": {
     "module_name": "index",
