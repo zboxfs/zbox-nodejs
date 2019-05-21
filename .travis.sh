@@ -22,9 +22,10 @@ export PATH="$HOME/.cargo/bin:$PATH"
 source "$HOME/.cargo/env"
 
 # Install NPM packages
+export SODIUM_LIB_DIR=/usr/lib
+export SODIUM_STATIC=true
 cd $TRAVIS_BUILD_DIR
 rustc --version
 node -v
 npm -v
-npm install
-npm run build
+npm install && npm run build
