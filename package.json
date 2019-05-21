@@ -1,6 +1,6 @@
 {
   "name": "@zbox/nodejs",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Node.js binding for ZboxFS",
   "main": "lib/index.js",
   "author": "Bo Lu",
@@ -32,9 +32,10 @@
     "build": "neon build --release",
     "test": "./node_modules/mocha/bin/mocha",
     "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'",
-    "install": "node-pre-gyp install --fallback-to-build=false || neon build --release",
+    "install": "node-pre-gyp install --fallback-to-build=false --update-binary || neon build --release",
     "package": "node-pre-gyp package",
-    "upload-binary": "node-pre-gyp package && node-pre-gyp-github publish"
+    "upload-binary": "node-pre-gyp package && node-pre-gyp-github publish",
+    "prepack": "[ -z \"$CI\" ] && cat /dev/null > native/index.node"
   },
   "devDependencies": {
     "chai": "^4.2.0",
