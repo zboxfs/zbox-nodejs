@@ -23,6 +23,7 @@ source "$HOME/.cargo/env"
 
 # Install NPM packages
 cd $TRAVIS_BUILD_DIR
+rustc --version
 node -v
 npm -v
 npm install
