@@ -32,7 +32,7 @@
     "build": "neon build --release",
     "test": "./node_modules/mocha/bin/mocha",
     "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'",
-    "install": "[ -z \"$CI\" ] && node-pre-gyp install --fallback-to-build=false --update-binary",
+    "install": "if [ -z \"$CI\" ]; then node-pre-gyp install --fallback-to-build=false --update-binary; else :; fi",
     "package": "node-pre-gyp package",
     "upload-binary": "node-pre-gyp package && node-pre-gyp-github publish",
     "prepack": "[ -z \"$CI\" ] && cat /dev/null > native/index.node"
