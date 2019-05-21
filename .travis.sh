@@ -26,4 +26,4 @@ cd $TRAVIS_BUILD_DIR
 rustc --version
 node -v
 npm -v
-npm install
+#npm install
