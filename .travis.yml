@@ -13,8 +13,7 @@ cache:
   - cargo: true
 
 env:
-  - SODIUM_LIB_DIR=/usr/lib
-  - SODIUM_STATIC=true
+  - SODIUM_LIB_DIR=/usr/lib SODIUM_STATIC=true
 
 before_install:
   - ./.travis.sh
