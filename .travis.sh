@@ -9,7 +9,6 @@ export PATH="$HOME/.cargo/bin:$PATH"
 source "$HOME/.cargo/env"
 
 # Install NPM packages
-export SODIUM_STATIC=true
 cd $TRAVIS_BUILD_DIR
 rustc --version
 node -v
