@@ -28,8 +28,8 @@
   },
   "scripts": {
     "lint": "eslint ./lib",
-    "build": "neon build --release",
-    "test": "./node_modules/mocha/bin/mocha",
+    "build": "./node_modules/.bin/neon build --release",
+    "test": "./node_modules/.bin/mocha",
     "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'",
     "install": "if [ -z \"$CI\" ]; then node-pre-gyp install --fallback-to-build=false; else :; fi",
     "package": "node-pre-gyp package",
