@@ -1,28 +1,21 @@
 os:
   - linux
 
-dist: xenial
+services:
+  - docker
 
 language: node_js
 
 node_js:
   - 10
 
-cache:
-  - npm: true
-  - cargo: true
-
-env:
-  - SODIUM_LIB_DIR=/usr/lib SODIUM_STATIC=true
-
 before_install:
-  - ./.travis.sh
+  - docker run --rm -v $PWD:/root/zbox zboxfs/nodejs npm run build
 
 script:
-  - npm test
   # Publish when using '[publish binary]' keywords
   - COMMIT_MESSAGE=$(git log --format=%B --no-merges -n 1 | tr -d '\n')
-  - if [[ ${COMMIT_MESSAGE} =~ "[publish binary]" ]]; then yarn upload-binary || exit 0; fi;
+  - if [[ ${COMMIT_MESSAGE} =~ "[publish binary]" ]]; then npm run upload-binary || exit 0; fi;
 
 notifications:
   email:
