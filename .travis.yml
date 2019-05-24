@@ -10,6 +10,7 @@ node_js:
   - 10
 
 before_install:
+  - docker run --rm -v $PWD:/root/zbox zboxfs/nodejs npm install
   - docker run --rm -v $PWD:/root/zbox zboxfs/nodejs npm run build
 
 script:
