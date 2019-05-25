@@ -1,17 +1,17 @@
 os:
   - linux
 
-services:
-  - docker
-
 language: node_js
 
 node_js:
   - 10
 
+env:
+  - BUILD_NPM_PACKAGE=true
+
 before_install:
-  - docker run --rm -v $PWD:/root/zbox zboxfs/nodejs npm install
-  - docker run --rm -v $PWD:/root/zbox zboxfs/nodejs npm run build
+  - npm install
+  - npm run build
 
 script:
   # Publish when using '[publish binary]' keywords
