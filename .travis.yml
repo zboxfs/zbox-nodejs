@@ -7,7 +7,7 @@ node_js:
   - 10
 
 env:
-  - BUILD_NPM_PACKAGE=true
+  - BUILD_NPM_PACKAGE=true SODIUM_LIB_DIR=/usr/lib SODIUM_STATIC=true
 
 cache:
   cargo: true
