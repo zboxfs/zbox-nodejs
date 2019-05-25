@@ -9,9 +9,14 @@ node_js:
 env:
   - BUILD_NPM_PACKAGE=true
 
+cache:
+  cargo: true
+  npm: true
+  directories:
+    - $TRAVIS_BUILD_DIR/libsodium
+
 before_install:
-  - npm install
-  - npm run build
+  - ./.travis.sh
 
 script:
   # Publish when using '[publish binary]' keywords
