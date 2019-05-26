@@ -1,6 +1,6 @@
 {
   "name": "@zbox/nodejs",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Node.js binding for ZboxFS",
   "main": "lib/index.js",
   "author": "Bo Lu",
@@ -20,7 +20,7 @@
     "remote_path": "{version}",
     "package_name": "{node_abi}-{platform}-{arch}.tar.gz",
     "module_path": "./native",
-    "pkg_path": "."
+    "pkg_path": "./native"
   },
   "dependencies": {
     "@amilajack/node-pre-gyp": "github:amilajack/node-pre-gyp#neon-compat",
