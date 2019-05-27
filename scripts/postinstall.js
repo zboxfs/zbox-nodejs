@@ -1,12 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 
-const npath = path.join(__dirname, '..', 'node_modules/@zbox/nodejs/native/');
+const npath = path.join(__dirname, '..', 'native');
 
-try {
-  fs.readdirSync(npath)
-    .filter(f => /[.]js$/.test(f))
-    .map(f => fs.unlinkSync(npath + f));
-} catch (err) {
-  // ignore errors
-}
+fs.readdirSync(npath)
+  .filter(f => /[.]js$/.test(f))
+  .map(f => {
+    try {
+      fs.unlinkSync(npath + f)
+    } catch (err) {
+      // ignore error
+    }
+  });
