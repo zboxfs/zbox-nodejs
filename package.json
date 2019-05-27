@@ -1,6 +1,6 @@
 {
   "name": "@zbox/nodejs",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Node.js binding for ZboxFS",
   "main": "lib/index.js",
   "author": "Bo Lu",
@@ -13,6 +13,7 @@
   "files": [
     "examples",
     "lib",
+    "scripts",
     "native"
   ],
   "binary": {

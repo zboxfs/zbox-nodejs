@@ -1,8 +1,11 @@
 const fs = require('fs');
 
+const path = './node_modules/@zbox/nodejs/native/';
+
 try {
-  fs.unlinkSync('./node_modules/@zbox/nodejs/native/index.js');
-  fs.unlinkSync('./node_modules/@zbox/nodejs/native/utils.js');
+  fs.readdirSync(path)
+    .filter(f => /[.]js$/.test(f))
+    .map(f => fs.unlinkSync(path + f));
 } catch (err) {
   // ignore errors
 }
