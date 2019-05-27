@@ -3,8 +3,13 @@
 This pacakge is Node.js binding for `ZboxFS`.
 
 ZboxFS is a zero-details, privacy-focused in-app file system. Its goal is
-to help application store files securely, privately and reliably. Check more
-details about ZboxFS: https://github.com/zboxfs/zbox.
+to help application store files securely, privately and reliably. More details
+about ZboxFS: https://github.com/zboxfs/zbox.
+
+# Get Started
+
+To use this pacakge, first visit https://try.zbox.io to create a test repo, and
+then copy its URI and use it by replacing `[your_repo_uri]` in below code.
 
 ## Installation
 
@@ -12,12 +17,7 @@ details about ZboxFS: https://github.com/zboxfs/zbox.
 npm i @zbox/nodejs
 ```
 
-## Get Started
-
-To use this pacakge, first visit https://try.zbox.io to create a test repo, and
-then copy its URI and use it by replacing `[your_repo_uri]` in below code.
-
-### Hello World
+## Hello World
 
 ```js
 const assert = require('assert').strict;
@@ -57,7 +57,7 @@ const zbox = new Zbox();
 })();
 ```
 
-## API Documentation
+# API Documentation
 
 Check the API documentation at https://docs.zbox.io/api/.
 
@@ -65,16 +65,15 @@ Check the API documentation at https://docs.zbox.io/api/.
 
 This is for advanced user.
 
-If you only want to use this package, you don't need to build the shared
-library yourself as `npm install` will automatically download the pre-built
-binary.
+If just use this package, you don't need to build the shared library yourself
+as `npm install` will automatically download the pre-built binary.
 
 This library needs to be compiled to platform-specific binary, it currently
-supports 64-bit Linux, macOS and Windows. After running building command, it
-will generate `index.node` shared library in `native` folder.
+supports 64-bit Linux, macOS and Windows.
 
-The `index.node` shared library must be used with javascript wrappers, which
-can be found in `lib` directory.
+After running the building command below, it will generate `index.node` shared
+library in `native` folder. This library must be used with javascript wrappers,
+which can be found in `lib` directory.
 
 ## Linux
 
