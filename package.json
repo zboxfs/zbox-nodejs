@@ -13,7 +13,7 @@
   "files": [
     "examples",
     "lib",
-    "native/index.node"
+    "native"
   ],
   "binary": {
     "module_name": "index",
@@ -31,11 +31,11 @@
     "lint": "eslint ./lib",
     "build": "./node_modules/.bin/neon build --release",
     "test": "./node_modules/.bin/mocha",
-    "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x 'neon build && ./node_modules/mocha/bin/mocha'",
-    "install": "if [ -z \"$BUILD_NPM_PACKAGE\" ]; then node-pre-gyp install --fallback-to-build=false; else :; fi",
+    "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x './node_modules/.bin/neon build && ./node_modules/mocha/bin/mocha'",
+    "install": "node-pre-gyp install --fallback-to-build=false",
     "package": "node-pre-gyp package",
     "upload-binary": "node-pre-gyp package && node-pre-gyp-github publish",
-    "prepack": "[ -z \"$BUILD_NPM_PACKAGE\" ] && rm -f native/index.node"
+    "prepack": "node scripts/prepack.js"
   },
   "devDependencies": {
     "neon-cli": "^0.2.0",

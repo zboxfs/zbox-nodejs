@@ -8,14 +8,14 @@ about ZboxFS: https://github.com/zboxfs/zbox.
 
 # Get Started
 
-To use this pacakge, first visit https://try.zbox.io to create a test repo, and
-then copy its URI and use it by replacing `[your_repo_uri]` in below code.
-
 ## Installation
 
 ```sh
 npm i @zbox/nodejs
 ```
+
+To use this pacakge, first visit https://try.zbox.io to create a test repo, and
+then copy its URI and use it by replacing `[your_repo_uri]` in below code.
 
 ## Hello World
 
