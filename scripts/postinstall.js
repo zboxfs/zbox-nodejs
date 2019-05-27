@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const npath = path.join(__dirname, '..', 'native');
+const npath = path.join(__dirname, '..', 'native/');
 
 fs.readdirSync(npath)
   .filter(f => /[.]js$/.test(f))
