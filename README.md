@@ -63,10 +63,9 @@ Check the API documentation at https://docs.zbox.io/api/.
 
 # How to build ZboxFS shared library by yourself
 
-This is for advanced user.
-
-If just use this package, you don't need to build the shared library yourself
-as `npm install` will automatically download the pre-built binary.
+This is for advanced user. If just use this package, you don't need to build
+the shared library yourself as `npm install` will automatically download the
+pre-built binary.
 
 This library needs to be compiled to platform-specific binary, it currently
 supports 64-bit Linux, macOS and Windows.
@@ -78,6 +77,7 @@ which can be found in `lib` directory.
 ## Linux
 
 ### Prerequisites
+
 Docker
 
 ### Build
@@ -93,6 +93,25 @@ docker run --rm -v $PWD:/root/zbox zboxfs/nodejs npm run build
 ### Prerequisites
 
 [Rust](https://www.rust-lang.org/)
+
+### Build
+
+Use below command to build the shared library.
+
+```sh
+npm run build
+```
+
+## Windows
+
+### Prerequisites
+
+- [Rust](https://www.rust-lang.org/)
+
+- windows-build-tools
+  ```sh
+  npm install --global --production windows-build-tools
+  ```
 
 ### Build
 
