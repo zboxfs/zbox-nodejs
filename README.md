@@ -14,8 +14,8 @@ npm i @zbox/nodejs
 
 ## Get Started
 
-To use this pacakge, first visit https://try.zbox.io to create a test repo. And
-then copy its URI and use it in below example code by replacing `[your_repo_uri]`.
+To use this pacakge, first visit https://try.zbox.io to create a test repo, and
+then copy its URI and use it by replacing `[your_repo_uri]` in below code.
 
 ### Hello World
 
@@ -43,11 +43,11 @@ const zbox = new Zbox();
   // write content to file
   await file.writeOnce('Hello World!')
 
-  // seek to start of the file
+  // seek to begining of the file
   await file.seek({ from: Zbox.SeekFrom.Start, offset: 0 });
 
   // read all content as string
-  var const = await file.readAllString()
+  const str = await file.readAllString()
   assert.strictEqual(str, 'Hello World!');
 
   // close file and repo
@@ -61,15 +61,49 @@ const zbox = new Zbox();
 
 Check the API documentation at https://docs.zbox.io/api/.
 
-## How to build this package by yourself
+# How to build ZboxFS shared library by yourself
 
-Make sure you've installed [Rust](https://www.rust-lang.org/), then use below
-command to build this binary library.
+This is for advanced user.
+
+If you only want to use this package, you don't need to build the shared
+library yourself as `npm install` will automatically download the pre-built
+binary.
+
+This library needs to be compiled to platform-specific binary, it currently
+supports 64-bit Linux, macOS and Windows. After running building command, it
+will generate `index.node` shared library in `native` folder.
+
+The `index.node` shared library must be used with javascript wrappers, which
+can be found in `lib` directory.
+
+## Linux
+
+### Prerequisites
+Docker
+
+### Build
+
+Use `zboxfs/nodejs` docker image to build the shared library.
+
+```sh
+docker run --rm -v $PWD:/root/zbox zboxfs/nodejs npm run build
+```
+
+## macOS
+
+### Prerequisites
+
+[Rust](https://www.rust-lang.org/)
+
+### Build
+
+Use below command to build the shared library.
 
 ```sh
 npm run build
 ```
 
-This will generate `index.node` shared library in `native` folder. This library
-is platform-specific, which currently supports 64-bit Linux, macOS and Windows.
+# License
 
+This package is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE)
+file for details.

@@ -11,6 +11,7 @@
     "url": "git+https://github.com/zboxfs/zbox-nodejs.git"
   },
   "files": [
+    "examples",
     "lib",
     "native/index.node"
   ],
