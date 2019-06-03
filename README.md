@@ -1,10 +1,10 @@
 # zbox-nodejs
 
-This pacakge is Node.js binding for `ZboxFS`.
+This pacakge is Node.js binding for [ZboxFS].
 
 ZboxFS is a zero-details, privacy-focused in-app file system. Its goal is
-to help application store files securely, privately and reliably. More details
-about ZboxFS: https://github.com/zboxfs/zbox.
+to help application store files securely, privately and reliably. Check more
+details about [ZboxFS].
 
 # Get Started
 
@@ -14,10 +14,10 @@ about ZboxFS: https://github.com/zboxfs/zbox.
 npm i @zbox/nodejs
 ```
 
-To use this pacakge, first visit https://try.zbox.io to create a test repo, and
-then copy its URI and use it by replacing `[your_repo_uri]` in below code.
+## Hello World Example
 
-## Hello World
+Visit https://try.zbox.io to create a test repo. Copy its URI and replace
+`[your_repo_uri]` in below.
 
 ```js
 const assert = require('assert').strict;
@@ -26,14 +26,14 @@ const Zbox = require('@zbox/nodejs');
 // create a Zbox instance
 const zbox = new Zbox();
 
-(async function run() {
+(async () => {
   // initialise environment, called once before using Zbox
   await zbox.initEnv({ debug: true });
 
   // open the repo
   var repo = await zbox.openRepo({
     uri: '[your_repo_uri]',
-    pwd: 'pwd',
+    pwd: 'secret password',
     opts: { create: true }
   });
 
@@ -61,16 +61,15 @@ const zbox = new Zbox();
 
 Check the API documentation at https://docs.zbox.io/api/.
 
-# How to build ZboxFS shared library by yourself
+# How to Build
 
-This is for advanced user. If just use this package, you don't need to build
-the shared library yourself as `npm install` will automatically download the
-pre-built binary.
+This is for advanced user. If simply use this package, you don't need to build
+by yourself as `npm install` will automatically download the pre-built binary.
 
 This library needs to be compiled to platform-specific binary, it currently
 supports 64-bit Linux, macOS and Windows.
 
-After running the building command below, it will generate `index.node` shared
+After running the building command, it will generate `index.node` shared
 library in `native` folder. This library must be used with javascript wrappers,
 which can be found in `lib` directory.
 
@@ -78,7 +77,7 @@ which can be found in `lib` directory.
 
 ### Prerequisites
 
-Docker
+[Docker](https://www.docker.com/)
 
 ### Build
 
@@ -125,3 +124,5 @@ npm run build
 
 This package is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE)
 file for details.
+
+[ZboxFS]: https://github.com/zboxfs/zbox

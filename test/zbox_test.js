@@ -1,19 +1,21 @@
+// Note: This test file is used for both browser and Node.js. It is currently
+// mirrored in two git repos:
+//
+// - https://github.com/zboxfs/zbox-browser
+// - https://github.com/zboxfs/zbox-nodejs
+//
+// When modifed one, you should copy and test it in the other.
+
 const isNodeJs = (typeof process !== 'undefined') && (process.release.name === 'node');
 
 const TIMEOUT = 60 * 1000;
 
-let uri = 'zbox://d9Ysc4PJa5sT7NKJyxDjMpZg@jRpbY2DEra6qMR';
+let uri = 'zbox://AMRhzweUskrvKCGgvkg458ED@ukWpyLVyBz3sSX';
 let uri2 = 'zbox://2c3kbfSqsKYpf36fKKc5YpEY@Rwt6Nh6xesE3n5'; // for Node.js
 const pwd = 'pwd';
 
 if (isNodeJs) {
   uri += '?cache_type=file&base=./tt';
-
-  // if it runs on Travis CI server, skip the test just for now
-  if(process.env.CI) {
-    process.exit();
-  }
-
 } else {
   // if it runs in browser
   uri += '?cache_type=browser';
@@ -147,7 +149,7 @@ describe('Repo Open/Close Test', function() {
 // ============================================
 // File IO Test
 // ============================================
-describe('File IO Test', function() {
+describe.only('File IO Test', function() {
   let repo, filePath;
   const buf = new Uint8Array([1, 2, 3]);
   const buf2 = new Uint8Array([4, 5, 6]);
@@ -228,7 +230,7 @@ describe('File IO Test', function() {
   });
 
   it(`should read as stream (Node.js)`, function(done) {
-    if (!isNodeJs) return;
+    if (!isNodeJs) return done();
 
     let file;
 

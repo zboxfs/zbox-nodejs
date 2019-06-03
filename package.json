@@ -2,8 +2,15 @@
   "name": "@zbox/nodejs",
   "version": "0.1.13",
   "description": "Node.js binding for ZboxFS",
+  "keywords": [
+    "filesystem",
+    "crypto",
+    "security",
+    "privacy",
+    "rust"
+  ],
   "main": "lib/index.js",
-  "author": "Bo Lu",
+  "author": "Zbox Support <support@zbox.io>",
   "homepage": "https://github.com/zboxfs/zbox-nodejs",
   "license": "Apache-2.0",
   "repository": {
