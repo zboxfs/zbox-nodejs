@@ -23,10 +23,10 @@ Visit https://try.zbox.io to create a test repo. Copy its URI and replace
 const assert = require('assert').strict;
 const Zbox = require('@zbox/nodejs');
 
-// create a Zbox instance
-const zbox = new Zbox();
-
 (async () => {
+  // create a Zbox instance
+  const zbox = new Zbox();
+
   // initialise environment, called once before using Zbox
   await zbox.initEnv({ debug: true });
 
@@ -38,17 +38,17 @@ const zbox = new Zbox();
   });
 
   // create a file
-  var file = await repo.createFile('/hello_world.txt')
+  var file = await repo.createFile('/hello_world.txt');
 
   // write content to file
-  await file.writeOnce('Hello World!')
+  await file.writeOnce('Hello, World!');
 
-  // seek to begining of the file
+  // seek to the beginning of file
   await file.seek({ from: Zbox.SeekFrom.Start, offset: 0 });
 
   // read all content as string
   const str = await file.readAllString()
-  assert.strictEqual(str, 'Hello World!');
+  assert.strictEqual(str, 'Hello, World!');
 
   // close file and repo
   await file.close();

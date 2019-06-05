@@ -10,7 +10,7 @@ use std::time::SystemTime;
 use neon::prelude::*;
 
 use zbox::{
-    init_env as zbox_init_env, Cipher, Error, File, MemLimit, Metadata,
+    self as zbox_lib, Cipher, Error, File, MemLimit, Metadata,
     OpenOptions, OpsLimit, Repo, RepoOpener, Version, VersionReader,
 };
 
@@ -39,8 +39,14 @@ fn error_string(err: Error) -> String {
 
 #[allow(dead_code)]
 fn init_env(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    zbox_init_env();
+    zbox_lib::init_env();
     Ok(cx.undefined())
+}
+
+#[allow(dead_code)]
+fn zbox_version(mut cx: FunctionContext) -> JsResult<JsString> {
+    let ver = zbox_lib::zbox_version();
+    Ok(cx.string(ver))
 }
 
 #[allow(dead_code)]
@@ -935,6 +941,7 @@ declare_types! {
 
 register_module!(mut cx, {
     cx.export_function("initEnv", init_env)?;
+    cx.export_function("version", zbox_version)?;
     cx.export_function("openRepo", open_repo)?;
     cx.export_function("repoExists", repo_exists)?;
     cx.export_function("repairSuperBlock", repair_super_block)?;

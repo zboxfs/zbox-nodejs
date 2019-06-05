@@ -57,6 +57,12 @@ describe('Repo Open/Close Test', function() {
     await zbox.initEnv({ debug: true });
   });
 
+  it('should get zbox version', async function() {
+    const ver = await zbox.version();
+    console.log(ver);
+    expect(ver).to.be.a('string');
+  });
+
   it('should not open repo with wrong argument', async function() {
     await expectError(zbox.openRepo());
     await expectError(zbox.openRepo(null));
@@ -149,7 +155,7 @@ describe('Repo Open/Close Test', function() {
 // ============================================
 // File IO Test
 // ============================================
-describe.only('File IO Test', function() {
+describe('File IO Test', function() {
   let repo, filePath;
   const buf = new Uint8Array([1, 2, 3]);
   const buf2 = new Uint8Array([4, 5, 6]);
