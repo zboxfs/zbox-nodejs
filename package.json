@@ -43,7 +43,7 @@
     "install": "node-pre-gyp install --fallback-to-build=false",
     "postinstall": "node scripts/postinstall.js",
     "package": "node-pre-gyp package",
-    "upload-binary": "node-pre-gyp package && node-pre-gyp-github publish",
+    "upload-binary": "node-pre-gyp-github publish",
     "prepack": "node scripts/prepack.js"
   },
   "devDependencies": {
