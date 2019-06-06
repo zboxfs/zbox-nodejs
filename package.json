@@ -1,6 +1,6 @@
 {
   "name": "@zbox/nodejs",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Node.js binding for ZboxFS",
   "keywords": [
     "filesystem",
