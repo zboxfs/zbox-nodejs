@@ -1,6 +1,6 @@
 {
   "name": "@zbox/nodejs",
-  "version": "0.1.15",
+  "version": "0.2.0",
   "description": "Node.js binding for ZboxFS",
   "keywords": [
     "filesystem",
@@ -38,6 +38,7 @@
   "scripts": {
     "lint": "eslint ./lib",
     "build": "./node_modules/.bin/neon build --release",
+    "build-linux": "docker run --rm -v $PWD:/root/zbox zboxfs/nodejs /bin/bash -c 'npm run build && npm run package'",
     "test": "./node_modules/.bin/mocha",
     "watch": "./node_modules/nodemon/bin/nodemon.js -w native -e rs -w lib -w test -e js -x './node_modules/.bin/neon build && ./node_modules/mocha/bin/mocha'",
     "install": "node-pre-gyp install --fallback-to-build=false",

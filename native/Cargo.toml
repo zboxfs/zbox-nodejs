@@ -19,4 +19,4 @@ neon-build = "0.2.0"
 
 [dependencies]
 neon = "0.2.0"
-zbox = { version = "0.8.1", features = ["storage-zbox-native"] }
+zbox = { version = "0.8.2", features = ["storage-zbox-native"] }
