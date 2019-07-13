@@ -16,7 +16,7 @@ npm i @zbox/nodejs
 
 ## Hello World Example
 
-Visit https://try.zbox.io to create a test repo. Copy its URI and replace
+Visit https://zbox.io/try to create a test repo. Copy its URI and replace
 `[your_repo_uri]` in below.
 
 ```js
@@ -28,7 +28,7 @@ const Zbox = require('@zbox/nodejs');
   const zbox = new Zbox();
 
   // initialise environment, called once before using Zbox
-  await zbox.initEnv({ debug: true });
+  await zbox.initEnv({ log: { level: 'debug' } });
 
   // open the repo
   var repo = await zbox.openRepo({
