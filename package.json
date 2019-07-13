@@ -1,6 +1,6 @@
 {
   "name": "@zbox/nodejs",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Node.js binding for ZboxFS",
   "keywords": [
     "filesystem",
@@ -10,7 +10,7 @@
     "rust"
   ],
   "main": "lib/index.js",
-  "author": "Zbox Support <support@zbox.io>",
+  "author": "Zbox.io",
   "homepage": "https://github.com/zboxfs/zbox-nodejs",
   "license": "Apache-2.0",
   "repository": {

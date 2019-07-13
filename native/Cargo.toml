@@ -2,7 +2,7 @@
 name = "zbox-nodejs"
 version = "0.1.0"
 description = "Node.js binding for ZboxFS, a zero-details, privacy-focused in-app file system."
-authors = ["Bo Lu"]
+authors = ["Zbox.io"]
 homepage = "https://github.com/zboxfs/zbox-nodejs"
 repository = "https://github.com/zboxfs/zbox-nodejs"
 readme = "README.md"
@@ -19,4 +19,4 @@ neon-build = "0.2.0"
 
 [dependencies]
 neon = "0.2.0"
-zbox = { version = "0.8.2", features = ["storage-zbox-native"] }
+zbox = { version = "0.8.3", features = ["storage-zbox-native"] }
