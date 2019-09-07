@@ -15,8 +15,8 @@ name = "zbox_nodejs"
 crate-type = ["dylib"]
 
 [build-dependencies]
-neon-build = "0.2.0"
+neon-build = "0.3.1"
 
 [dependencies]
-neon = "0.2.0"
-zbox = { version = "0.8.3", features = ["storage-zbox-native"] }
+neon = "0.3.1"
+zbox = { version = "0.8.5", features = ["storage-zbox-native"] }
