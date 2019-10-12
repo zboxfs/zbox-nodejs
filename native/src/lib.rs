@@ -100,6 +100,10 @@ fn open_repo(mut cx: FunctionContext) -> JsResult<JsNumber> {
     {
         opener.read_only(read_only.value());
     }
+    if let Ok(force) = opts.get(&mut cx, "force")?.downcast::<JsBoolean>()
+    {
+        opener.force(force.value());
+    }
 
     opener
         .open(&uri, &pwd)
